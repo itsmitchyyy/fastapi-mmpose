@@ -41,7 +41,9 @@ RUN mim install "mmpose==1.3.1"
 RUN mim install "mmdet==3.2.0"
 
 RUN groupadd -g ${GID} ${GROUP_NAME} \
-    && useradd -ms /bin/sh -u ${UID} -g ${GID} ${USER_NAME}
+    && useradd -ms /bin/sh -u ${UID} -g ${GID} ${USER_NAME} \
+    echo "$USER_NAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USER_NAME && \
+    chmod 0440 /etc/sudoers.d/$USER_NAME
 
 USER ${USER_NAME}
 WORKDIR ${APPLICATION_DIRECTORY}
