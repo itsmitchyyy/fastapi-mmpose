@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+numpy-quaternion
+torch
+torchvision
+pillow
+python-multipart
+aiofiles

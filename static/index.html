@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Pose Detection</title>
+  </head>
+  <body>
+    <h1>Upload Video for Pose Detection</h1>
+    <form id="upload-form" enctype="multipart/form-data">
+      <input type="file" id="file" name="file" />
+      <button type="submit">Upload</button>
+    </form>
+    <pre id="response"></pre>
+    <video
+      id="output-video"
+      controls
+      style="display: none; margin-top: 20px; width: 640px"
+    ></video>
+
+    <script>
+      document
+        .getElementById("upload-form")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const formData = new FormData();
+          formData.append("file", document.getElementById("file").files[0]);
+
+          const response = await fetch("/upload/", {
+            method: "POST",
+            body: formData,
+          });
+
+          const result = await response.json();
+          document.getElementById("response").textContent = JSON.stringify(
+            result,
+            null,
+            2
+          );
+
+          // Display the processed video
+          const videoElement = document.getElementById("output-video");
+          videoElement.src = result.output_path;
+          videoElement.style.display = "block";
+        });
+    </script>
+  </body>
+</html>
