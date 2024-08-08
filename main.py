@@ -1,5 +1,5 @@
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import aiofiles
 import cv2
@@ -76,3 +76,7 @@ async def upload_file(file: UploadFile = File(...)):
 
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+    
+@app.get("/")
+async def get_index():
+    return FileResponse('static/index.html')
