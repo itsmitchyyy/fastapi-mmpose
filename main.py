@@ -1,6 +1,8 @@
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.concurrency import run_in_threadpool
+from tempfile import NamedTemporaryFile
 
 import aiofiles
 import cv2
@@ -69,15 +71,11 @@ def process_one_image(self, img, detector, pose_estimator, visualizer=None, show
                 kpt_thr=0.3)
 
     # if there is no instance detected, return None
-    return data_samples.get('pred_instances', None)   
+    return data_samples.get('pred_instances', None) 
 
-@app.post("/upload/")
-async def upload_file(file: UploadFile = File(...)):
-    # Save the uploaded video to a temporary file
-    video_path = 'temp_video.mp4'
-    async with aiofiles.open(video_path, 'wb') as f:
-        await f.write(await file.read())
-        
+def process_video(video_path: str):
+    assert has_mmdet, 'Please install mmdet to run the demo.' 
+    
     output_root = os.path.join(os.getcwd(), 'output')
     mmengine.mkdir_or_exist(output_root)
     output_file = os.path.join(output_root, os.path.basename(video_path))
@@ -155,6 +153,30 @@ async def upload_file(file: UploadFile = File(...)):
         print_log(f'Video saved to {output_file}',logger='current',level=logging.INFO)
 
     return output_file
+
+
+@app.post("/upload/")
+async def upload_file(file: UploadFile = File(...)):
+    # Save the uploaded video to a temporary file
+    temp = NamedTemporaryFile(delete=False)
+    try:
+        try:
+            contents = file.file.read()
+            with temp as f:
+                f.write(contents)
+        except Exception:
+            return {"message": "There was an error uploading the file"}
+        finally:
+            file.file.close()
+        
+        res = process_video(temp.name)  # Pass temp.name to VideoCapture()
+    except Exception:
+        return {"message": "There was an error processing the file"}
+    finally:
+        #temp.close()  # the `with` statement above takes care of closing the file
+        os.remove(temp.name)
+        
+    return res
 
     
 @app.get("/")
