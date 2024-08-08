@@ -23,7 +23,7 @@ RUN add-apt-repository ppa:deadsnakes/ppa
 
 # Install necessary packages
 RUN apt update && apt install --no-install-recommends -y \
-    git wget curl make cmake ssh openssh-client ffmpeg libgl1-mesa-dev\
+    git sudo wget curl make cmake ssh openssh-client ffmpeg libgl1-mesa-dev\
     libglib2.0-0 libsm6 libxrender-dev libxext6 libgl1-mesa-glx\
     build-essential libssl-dev libffi-dev \
     python${PYTHON_VERSION} python3-pip python-is-python3 python${PYTHON_VERSION}-distutils python${PYTHON_VERSION}-dev
@@ -40,16 +40,17 @@ RUN mim install mmengine "mmcv==2.1.0"
 RUN mim install "mmpose==1.3.1"
 RUN mim install "mmdet==3.2.0"
 
-RUN groupadd -g ${GID} ${GROUP_NAME} \
-    && useradd -ms /bin/sh -u ${UID} -g ${GID} ${USER_NAME} \
+RUN groupadd --gid $GID $GROUP_NAME && \
+    useradd --uid $UID --gid $GID -m $USER_NAME && \
     echo "$USER_NAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USER_NAME && \
     chmod 0440 /etc/sudoers.d/$USER_NAME
 
-USER ${USER_NAME}
 WORKDIR ${APPLICATION_DIRECTORY}
 
 COPY . .
 RUN chown -R ${UID}:${GID} ${APPLICATION_DIRECTORY}
+
+USER ${USER_NAME}
 
 EXPOSE ${PORT_NUMBER}
 
