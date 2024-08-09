@@ -11,6 +11,7 @@ import aiofiles
 import cv2
 import numpy as np
 
+import subprocess
 import asyncio
 import os
 import logging
@@ -163,6 +164,17 @@ async def process_video(video_path: str):
             video_writer.release()
 
     cap.release()
+    
+    # convert to h.264 codec since it is more compatible with web
+    output_file_mp4 = os.path.basename(video_path)
+    output_file_suffix = output_file_mp4.split('.')[-1]
+    ffmpegProcess = subprocess.Popen(f"ffmpeg -i {output_file_mp4} -vcodec libx264 -f mp4 temp_output.{output_file_suffix} -y", cwd=output_root, shell=True)
+    ffmpegProcess.wait()
+    print(ffmpegProcess.communicate()[0])
+
+    replaceOutputProcess = subprocess.Popen(f"rm {output_file} && mv temp_output.{output_file_suffix} {output_file}", cwd=output_root, shell=True)
+    replaceOutputProcess.wait()
+    print(replaceOutputProcess.communicate()[0])
 
     if output_file:
         print_log(f'Video saved to {output_file}',logger='current',level=logging.INFO)
