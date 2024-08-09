@@ -1,17 +1,19 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
 from tempfile import NamedTemporaryFile
+from multiprocessing import Process
+
 
 import aiofiles
 import cv2
 import numpy as np
 
-import io
+import asyncio
 import os
 import logging
-import mimetypes
 import time
 
 import mmcv
@@ -26,18 +28,32 @@ from mmpose.registry import VISUALIZERS
 from mmpose.structures import merge_data_samples, split_instances
 from mmpose.utils import adapt_mmdet_pipeline
 
+process_pool: list[Process] = []
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    for process in process_pool:
+        process.kill()
+    for process in process_pool:
+        while process.is_alive():
+            continue
+        process.close()
+
 app = FastAPI()
 
 # Serve frontend files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount('/output', StaticFiles(directory="output"), name="output")
 
 try:
     from mmdet.apis import inference_detector, init_detector
     has_mmdet = True
 except (ImportError, ModuleNotFoundError):
+    print('hereerrormmdet')
     has_mmdet = False
     
-def process_one_image(self, img, detector, pose_estimator, visualizer=None, show_interval=0):
+async def process_one_image(img, detector, pose_estimator, visualizer=None, show_interval=0):
     # predict box
     det_result = inference_detector(detector, img)
     pred_instance = det_result.pred_instances.cpu().numpy()
@@ -73,7 +89,7 @@ def process_one_image(self, img, detector, pose_estimator, visualizer=None, show
     # if there is no instance detected, return None
     return data_samples.get('pred_instances', None) 
 
-def process_video(video_path: str):
+async def process_video(video_path: str):
     assert has_mmdet, 'Please install mmdet to run the demo.' 
     
     output_root = os.path.join(os.getcwd(), 'output')
@@ -109,12 +125,11 @@ def process_video(video_path: str):
     # then pass to the model in init_pose_estimator
     visualizer.set_dataset_meta(pose_estimator.dataset_meta, skeleton_style='mmpose')
 
-    input_type = mimetypes.guess_type(video_path)[0].split('/')[0]
-
     cap = cv2.VideoCapture(video_path)
 
     video_writer = None
     frame_idx = 0
+    
 
     while cap.isOpened():
         success, frame = cap.read()
@@ -124,10 +139,10 @@ def process_video(video_path: str):
 
         if not success:
             break
-
+        
         # topdown pose estimation
-        pred_instances = process_one_image(frame, detector, pose_estimator, visualizer, 0.001)
-
+        pred_instances = await process_one_image(frame, detector, pose_estimator, visualizer, 0.001)
+        
         if output_file is not None:
             frame_vis = visualizer.get_image()
 
@@ -154,30 +169,38 @@ def process_video(video_path: str):
 
     return output_file
 
+async def process_video_async(fn, *args):
+    await fn(*args)
+    await asyncio.sleep(5)
+
+def run_process_video(fn, *args):
+    asyncio.run(process_video_async(fn, *args))
+
 
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
-    # Save the uploaded video to a temporary file
-    temp = NamedTemporaryFile(delete=False)
     try:
-        try:
-            contents = file.file.read()
-            with temp as f:
-                f.write(contents)
-        except Exception:
-            return {"message": "There was an error uploading the file"}
-        finally:
-            file.file.close()
-        
-        res = process_video(temp.name)  # Pass temp.name to VideoCapture()
-    except Exception:
-        return {"message": "There was an error processing the file"}
-    finally:
-        #temp.close()  # the `with` statement above takes care of closing the file
-        os.remove(temp.name)
-        
-    return res
+        async with aiofiles.tempfile.NamedTemporaryFile("wb", suffix=".mp4", delete=False) as temp:
+            try:
+                contents = await file.read()
+                await temp.write(contents)
+            except Exception:
+                return {"error": "There was an error uploading the file"}
+            finally:
+                await temp.flush()
+                await temp.close()
 
+        process = Process(target=run_process_video, args=(process_video, temp.name))
+        process_pool.append(process)
+        process.start()
+        process.join()
+    except Exception:
+        return {"error": "There was an error uploading the file"}
+    # finally:
+    #     os.remove(temp.name)
+    
+        
+    return {"message": "File uploaded successfully", "output_file": temp.name}
     
 @app.get("/")
 async def get_index():
