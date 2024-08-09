@@ -6,3 +6,4 @@ torchvision
 pillow
 python-multipart
 aiofiles
+openmim
