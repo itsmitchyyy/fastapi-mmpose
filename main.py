@@ -200,7 +200,7 @@ async def upload_file(file: UploadFile = File(...)):
     #     os.remove(temp.name)
     
         
-    return {"message": "File uploaded successfully", "output_file": temp.name}
+    return {"message": "File uploaded successfully", "output_file": os.path.basename(temp.name)}
     
 @app.get("/")
 async def get_index():
