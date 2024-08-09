@@ -179,15 +179,15 @@ def run_process_video(fn, *args):
 
 @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
+    suffix = file.filename.split('.')[-1]
     try:
-        async with aiofiles.tempfile.NamedTemporaryFile("wb", suffix=".mp4", delete=False) as temp:
+        async with aiofiles.tempfile.NamedTemporaryFile("wb", suffix=f".{suffix}", delete=False) as temp:
             try:
                 contents = await file.read()
                 await temp.write(contents)
             except Exception:
                 return {"error": "There was an error uploading the file"}
             finally:
-                await temp.flush()
                 await temp.close()
 
         process = Process(target=run_process_video, args=(process_video, temp.name))
