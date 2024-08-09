@@ -5,6 +5,8 @@
 
 ### Installation
 
+Create a folder named `output` in the project root directory.
+
 ```
 docker build -f Dockerfile -t fastapi-mmpose .
 ```
