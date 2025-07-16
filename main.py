@@ -202,6 +202,7 @@ async def upload_file(file: UploadFile = File(...)):
             finally:
                 await temp.close()
 
+        print('temp.name', temp.name)
         process = Process(target=run_process_video, args=(process_video, temp.name))
         process_pool.append(process)
         process.start()
